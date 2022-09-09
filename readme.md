@@ -17,10 +17,10 @@ Another issue I had was that the walk animation would play in midair originating
 			aS.play("parun")#play animated sprite 'run' 
 			aS.flip_h = true#flip the sprite horizontally
       
-      elif Input.is_action_pressed("controlRight"):#This one is the opposite so that when the right arrow is pressed 
-			  velocity.x = 400 #velocity x is 200 play animation run don't flip
-			  aS.play("parun")
-			  aS.flip_h = false
+      			elif Input.is_action_pressed("controlRight"):#This one is the opposite so that when the right arrow is pressed 
+			  	velocity.x = 400 #velocity x is 200 play animation run don't flip
+			  	aS.play("parun")
+			  	aS.flip_h = false
         
 I got around this by adding some code at the end to check if the player is on the floor and if they're not to play a fall animation.
 
