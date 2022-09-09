@@ -84,6 +84,18 @@ In theory these should work, but my error was what I was trying to change exactl
 
  These were the main problems I came across on the first day of making this game.
  
+ I also added tutorial signs, which work using a 2DAreaShape and a CollisionShape2D as well as a label and sprite.
+ Initially I couldn't get these to quite work the way I wanted, this was before understanding that default nodes and extensions (the first part of the code) have the same spelling. You can get around this by using the dollar sign (which references the node directly) renaming the node or having an onready variable with the full name of the node and a different one in the variable name. The following code is the end result:
+ 
+ 	func _ready():#On ready when first entering scene
+		$Label.hide()#hide the child label
+	# warning-ignore:unused_argument
+	func _on_Area2Dztzi_body_entered(_body):#On entering the body
+		$Label.show()#Show the child label
+	# warning-ignore:unused_argument
+	func _on_Area2Dztzi_body_exited(_body):#On exiting the body
+		$Label.hide()#Hide child label
+ 
  Tuesday 6th September
  
  I wanted to make some collectibles for a mission purpose. As well as adding win or lose scenarios/parameters and obstacles. My first problem was trying to add it to an item that clears itself and is a unique instance. I also initially had a seperate script for the animation like so.
@@ -161,6 +173,15 @@ In the enemy enemy Death Audio
 
 	func receiveEnemyDead
 		play()
+		
+And similar for the fuel, evidenced by this snippet of leftover code
+
+	onready var fAr = $fuelArea
+	onready var fAu = $fuelAudio
+
+
+	func _ready():
+		fAr.connect("playFuelAudio", fAu, "receiveAudio")
 		
 I also had a death sprite seperate before undestand queue_free which I was trying to copy the translate of another node
 
@@ -277,6 +298,77 @@ Upon writing this previous section I have figured a way that I can tidy the scri
 
 
 	# warning-ignore:unused_argument
+	func _on_enemyDieArea2D_body_entered(_body):#On area entered
+		dead = true #set dead to true so that physics process is passed
+		speed = 0 #set speed to 0 so that velocity in turn is 0
+		$enemyKillArea2D.queue_free()
+		$enemyDieArea2D.queue_free()#cull script and children
+		eBS.stop()# this calls the animation to stop
+		eBS.play("blobSplat")#this then calls the death animation
+		deAu.play()#play death audio
+		yield(get_tree().create_timer(eBSsttime), "timeout")#wait eBSsttime .268 seconds
+		eBAu.queue_free()#queue free idle audio
+		eBS.queue_free()#queue free sprite
+		yield(get_tree().create_timer(eBAusttime), "timeout")# wait another .407 seconds
+		queue_free()#free entire queue of enemyBody2D
+		
+Adding a win zone was rather trivial after all of this. I used the following code, adding a if fuel is larger than x under the fuel count of player
+
+	func _ready():#On ready when first entering scene
+		$Label.hide()#Hides the child Label
+	func _on_Area2D_body_entered(body):#On entering the body
+		if body.get("liftoff"):#if the body that entered has a variable liftoff
+				# warning-ignore:return_value_discarded
+				get_tree().change_scene("res://levelOne.tscn")#Then change the scene(set to same scene for now)
+		else:
+			$Label.show()#(else show the label which has the text not enough fuel
+			#print("not enough fuel")###FOR DEBUGGING
+
+	# warning-ignore:unused_argument
+	func _on_WinArea2D2_body_exited(_body):#On exiting the body
+		$Label.hide()#Hide child label
+
+
+I mostly added Audio on Wednesday night, which went relatively error free. I did change a few things after learning about queue_free on individual nodes.
+
+Thursday 8th September
+Today in class I was getting colleagues to look at my game and see what they thought and what might need adding, most of the thoughts were as follows
+
+A story if time provides
+A death animation for the player and for the enemy
+A reflection of stars that scrolls/moves in the helmet (not sure how I would do this without some kind of in game mask
+Rocketship leaving animation
+
+I started by working on the death animations, the blob splatting and a skull showing up on player and a UI element.
+
+at first I had trouble with the UI element using a sprite because it had no show or hide properties like the Labels, so my original code looked something along the lines of
+
+	deathSp.show()#shows death sprite
+which changed to	
+	deathSp.visible = true
+	
+I also was trying to disable input initially by using a tree line of code
+
+	get_tree().get_root().set_disable_input(true)
+
+This wasn't working and instead added a variable called alive and gave it a boolean true/false and added to the top of my physics process a variable check
+
+	if alive == (true):
+	
+I ended up with a death function which looks like this
+
+	func death():
+		alive = false
+		deathSp.visible = true #sets the sprite to visible
+		aS.play("padeath")#plays the animation padeath
+		yield(get_tree().create_timer(deathtime_in_seconds), "timeout")
+		# warning-ignore:return_value_discarded
+		get_tree().reload_current_scene()
+		
+Presto, the player gets a death notice and is unable to move the onscreen player.
+
+The next thing I struggled with I covered a little bit already, that was the Enemy death animation, the enemy script was in it's entirety being culled before it could play the animation or the sound. The work around for this was culling nodes one at a time and using timers so that neither the animation or sound would get cut off.
+
 	func _on_enemyDieArea2D_body_entered(_body):#On area entered
 		dead = true #set dead to true so that physics process is passed
 		speed = 0 #set speed to 0 so that velocity in turn is 0
