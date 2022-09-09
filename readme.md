@@ -33,6 +33,7 @@ I got around this by adding some code at the end to check if the player is on th
 			aS.play("parun")#play animated sprite 'run' 
 			aS.flip_h = true#flip the sprite horizontally
 
+	
 		elif Input.is_action_pressed("controlRight") and is_on_floor():#This one is the opposite so that when the right arrow is pressed 
 			velocity.x = 400 #velocity x is 200 play animation run don't flip
 			aS.play("parun")
@@ -425,3 +426,74 @@ I also added a mine that explodes with sound.
 		mAu.play()
 		yield(get_tree().create_timer(mineexplodedtime),"timeout")
 		queue_free()
+I also changed things around with the camera and UI so that the camera is no longer parented and just copies the player position, I tried a few times to get this to work previously but now it works flawlessly.
+
+	extends Camera2D
+	var zoom_min = Vector2(1.0,1.0)#var zoom vector set to 1 (zoomed out)
+	var zoom_max = Vector2(.55,.55)#var zoom vector set to .55 (zoomed in)
+	var time_in_seconds = 0.150#var set to use for timer
+	onready var deathSp = $deathSprite
+	var follow = true
+
+	func _ready():
+		deathSp.visible = false
+
+	func _process(delta):
+		if follow == true:
+			self.position = get_parent().get_node("KinematicBody2D").position
+		else:
+			 pass
+
+	# warning-ignore:unused_argument
+	func _input(event):
+		if Input.is_action_pressed("zoom"):#If the action defined as zoom is pushed
+			if zoom == zoom_max:#If zoom is set to the same as the var
+				yield(get_tree().create_timer(time_in_seconds), "timeout")#grab tree and use variable as time til timeout
+				zoom = zoom_min#Set zoom to this var
+				offset.y = -200
+			else:
+				yield(get_tree().create_timer(time_in_seconds), "timeout")#grab tree and use variable as time til timeout
+				zoom = zoom_max#Set zoom to this var
+				offset.y = 0
+
+
+	func _on_KinematicBody2D_showdeathUI():
+		deathSp.visible = true
+		follow = false
+and in player
+
+	signal showdeathUI
+	func _ready():
+		pass
+
+	func death():
+		if deathtype == 1:
+			alive = false
+			self.emit_signal("showdeathUI")
+			aS.play("padeath")#plays the animation padeath
+			yield(get_tree().create_timer(deathtime_in_seconds), "timeout")
+		# warning-ignore:return_value_discarded
+			get_tree().reload_current_scene()
+		elif deathtype == 2:
+			alive = false
+			self.emit_signal("showdeathUI")
+			aS.play("padeathburnt")#plays the animation padeath
+			yield(get_tree().create_timer(deathtime_in_seconds), "timeout")
+		# warning-ignore:return_value_discarded
+			get_tree().reload_current_scene()
+		elif deathtype == 3:
+			alive = false
+			self.emit_signal("showdeathUI")
+			aS.play("padeathblob")#plays the animation padeath
+			yield(get_tree().create_timer(deathtime_in_seconds), "timeout")
+		# warning-ignore:return_value_discarded
+			get_tree().reload_current_scene()
+		elif deathtype == 4:
+			alive = false
+			self.emit_signal("showdeathUI")
+			aS.play("padeath")#plays the animation padeath
+			#$playerCamera2D.current = false
+			yield(get_tree().create_timer(deathtime_in_seconds), "timeout")
+		# warning-ignore:return_value_discarded
+			get_tree().reload_current_scene()
+This also allows me to decouple the UI from the player and attach it to the camera. This was all made possible by signals.
