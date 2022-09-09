@@ -4,10 +4,14 @@ This is the documentation for the game I started developing on the Godot engine 
 
 The first problem I encountered when I was creating the game was that the guide I was following used a method that kept breaking to calculate gravity.
 It would become exponential. The following is the code that was problematic.
+
 velocity.y = velocity.y + gravity * (delta)
+
 I discovered the issue when I was playtesting the game. After a few seconds of sitting still if you fell off a platform you would instantly hit the ground.
 After doing some research I found the easiest solution was to clamp this so that it had a max and min.
+
 velocity.y = clamp(velocity.y, -1500, 800)
+
 This solved the first issue I had.
 
 Another issue I had was that the walk animation would play in midair originating from this piece of code.
