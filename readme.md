@@ -162,7 +162,28 @@ In the enemy enemy Death Audio
 	func receiveEnemyDead
 		play()
 		
-It was a little bit messy, upon writing this I have figured a way that I can tidy the script up someore which I will paste afterwards.
+I also had a death sprite seperate before undestand queue_free which I was trying to copy the translate of another node
+
+	"""extends AnimatedSprite
+
+	onready var eB2D = "../$EnemyBody2D"
+	var sTran = transform.origin
+
+	func _ready():
+		hide()
+
+
+	func clonePosition(_delta):
+		sTran = eB2D.transform.origin
+		pass
+
+	func _on_enemyDieArea2D_body_entered(_body):
+		show()
+		play ("enemySplat")
+		var time_in_seconds = 0.168
+		yield(get_tree().create_timer(time_in_seconds), "timeout")
+		queue_free()"""
+It was a little bit messy. Here's the amended code.
 
 	var stopped = Vector2(0,0)
 	var velocity = Vector2(0,0)# This sets a variable for our velocity set to an empty vector
@@ -213,7 +234,7 @@ The following in the audio
 		yield(get_tree().create_timer(time_in_seconds), "timeout") #This yield waits for the grabbed tree which is a timer which counts down from our variable
 		queue_free() #This acts like a kill script function and kills everything parented to it and itself
 		
-Here is the script which I updated on Thursday and Friday which I found better because it means all the scripts are in one instead.
+Upon writing this previous section I have figured a way that I can tidy the script up someore, I found this better because it means all the scripts are in one instead.
 
 	extends KinematicBody2D
 	var stopped = Vector2(0,0)
