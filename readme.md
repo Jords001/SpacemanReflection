@@ -1,6 +1,6 @@
 Monday 5th September
 
-This is the documentation for the game I started developing on the Godot engine consisting of Gd script.
+This is the documentation for the game I started developing on the Godot engine consisting of Gd script. I've tried to cover as many problems as I've had, and update this list. However when things go without any problem I've added quite a few features, and some may go amiss here.
 
 The first problem I encountered when I was creating the game was that the guide I was following used a method that kept breaking to calculate gravity.
 It would become exponential. The following is the code that was problematic.
@@ -382,3 +382,46 @@ The next thing I struggled with I covered a little bit already, that was the Ene
 		eBS.queue_free()#queue free sprite
 		yield(get_tree().create_timer(eBAusttime), "timeout")# wait another .407 seconds
 		queue_free()#free entire queue of enemyBody2D
+Friday I added 2 unique death animations on the player and a death type, so depending on which deathtype is told by the 2DAreaShape the sprite will adjust accordingly, looking something like this
+
+	func death():
+	if deathtype == 1:
+		alive = false
+		deathSp.visible = true #sets the sprite to visible
+		aS.play("padeath")#plays the animation padeath
+		yield(get_tree().create_timer(deathtime_in_seconds), "timeout")
+	# warning-ignore:return_value_discarded
+		get_tree().reload_current_scene()
+	elif deathtype == 2:
+		alive = false
+		deathSp.visible = true #sets the sprite to visible
+		aS.play("padeathburnt")#plays the animation padeath
+		yield(get_tree().create_timer(deathtime_in_seconds), "timeout")
+	# warning-ignore:return_value_discarded
+		get_tree().reload_current_scene()
+	elif deathtype == 3:
+		alive = false
+		deathSp.visible = true #sets the sprite to visible
+		aS.play("padeathblob")#plays the animation padeath
+		yield(get_tree().create_timer(deathtime_in_seconds), "timeout")
+	# warning-ignore:return_value_discarded
+		get_tree().reload_current_scene()
+		
+I also added a mine that explodes with sound.
+
+	onready var mS = $mineSprite
+	onready var mAu = $mineAudio
+	var mineexplodedtime = 1.24
+
+	func _ready():
+		mS.play("mineidle")
+
+	func _on_mineArea2D_body_entered(body):#on body entering area
+		body.deathtype = 2
+		body.death()
+		$CollisionShape2D.queue_free()
+		mS.stop()
+		mS.play("mineexplode")
+		mAu.play()
+		yield(get_tree().create_timer(mineexplodedtime),"timeout")
+		queue_free()
