@@ -497,3 +497,172 @@ and in player
 		# warning-ignore:return_value_discarded
 			get_tree().reload_current_scene()
 This also allows me to decouple the UI from the player and attach it to the camera. This was all made possible by signals.
+
+I decided to change the camera system so that it can be done in increments using plus and minus instead.
+
+	var zoom_min = Vector2(1.0,1.0)#var zoom vector set to 1 (zoomed out)
+	var zoom_max = Vector2(0.60,0.60)#var zoom vector set to .55 (zoomed in)
+	var time_in_seconds = 0.150#var set to use for timer
+	onready var deathSp = $deathSprite
+	var zoom_increment = Vector2(.05,.05)
+	var follow = true
+	var zoomamount = zoom
+	var zoomextension = Vector2(1.0,1.0)
+
+	func _ready():
+		deathSp.visible = false
+
+	func _process(_delta):
+		if follow == true:
+			self.position = get_parent().get_node("KinematicBody2D").position
+		else:
+			 pass
+
+	# warning-ignore:unused_argument
+	func _input(event):
+		zoomextension.x = clamp(zoomextension.x, 0.6,1.0)
+		zoomextension.y = clamp(zoomextension.y, 0.6,1.0)
+		#zoom_increment = clamp(zoom_increment.y, 0.0,1.0)
+		if Input.is_action_pressed("zoomout"):#If the action defined as zoomin is pushed
+			if zoomextension == zoom_min:#If zoom is set to the same as the var
+				pass
+			else:
+				zoom += zoom_increment
+				zoomextension += zoom_increment
+		if Input.is_action_pressed("zoomin"):#If the action defined as zoomin is pushed
+			if zoomextension == zoom_max:
+				pass
+			else:
+				zoom -= zoom_increment
+				zoomextension -= zoom_increment
+				print (zoomextension)
+
+	func _on_KinematicBody2D_showdeathUI():
+		deathSp.visible = true
+		follow = false
+
+I added a UFO and some level coding as well as some asteroids for level 2. UFO:
+
+	var ufoactive = 1
+	# Declare member variables here. Examples:
+	# var a = 2
+	# var b = "text"
+
+
+	# Called when the node enters the scene tree for the first time.
+	func _ready():
+		pass # Replace with function body.
+
+
+	# Called every frame. 'delta' is the elapsed time since the previous frame.
+	#func _process(delta):
+	#	pass
+
+
+	func _on_ufoArea2D_body_entered(body):
+		if ufoactive == 1:
+			body.velocity.y = -1000
+		else:
+			pass
+
+
+	func _on_ufoStopArea2D_body_entered(body):
+		body.velocity.y = 0
+
+
+	func _on_ufoDeactivateArea2D_body_entered(_input):
+		$UFOcutaway.visible = false
+
+
+	func _on_ufoDeactivateArea2D_body_exited(_body):
+		$UFOcutaway.visible = true
+		
+Levelcode:
+
+	
+	var ufoarea = false
+	var ufoactive = 1
+
+	# Called when the node enters the scene tree for the first time.
+	func _ready():
+		pass # Replace with function body.
+
+	# Called every frame. 'delta' is the elapsed time since the previous frame.
+	#func _process(delta):
+	#	pass
+
+	func _input(_event):
+		if ufoarea == true:
+			if Input.is_action_pressed("controlUse"):
+				ufoactive = 0
+				print("ufodeactivated")
+
+
+	func _on_ufoDeactivateArea2D_body_entered(_body):
+		ufoarea = true
+		#print("ufoareaenter")
+		#print(ufoarea)
+
+
+
+	func _on_ufoDeactivateArea2D_body_exited(_body):
+		ufoarea = false
+		#print("ufoareaexit")
+		#print(ufoarea)
+Asteroids:
+
+	extends ParallaxLayer
+
+	var asteroid_speed = -10
+
+	onready var abg1 = $asteroid1Sbg/asteroid1bg
+	onready var abg2 = $asteroid1Sbg2/asteroid1bg
+	onready var abg3 = $asteroid1Sbg3/asteroid1bg
+	onready var abg4 = $asteroid1Sbg4/asteroid1bg
+	onready var abg5 = $asteroid1Sbg5/asteroid1bg
+	onready var abg6 = $asteroid1Sbg6/asteroid1bg
+	onready var abg7 = $asteroid2bg/asteroid2bg
+	onready var abg8 = $asteroid2bg2/asteroid2bg
+	onready var abg9 = $asteroid2bg3/asteroid2bg
+	onready var abg10 = $asteroid3Still/asteroid3bg
+	onready var abg11 = $asteroid3Still2/asteroid3bg
+	onready var abg12 = $asteroid3Still3/asteroid3bg
+	onready var abg13 = $asteroid3Still4/asteroid3bg
+	onready var abg14 = $asteroid4bg/asteroid4bg
+	onready var abg15 = $asteroid4bg2/asteroid4bg
+	onready var abg16 = $asteroid4bg3/asteroid4bg
+	onready var abg17 = $asteroid4bg4/asteroid4bg
+	onready var abg18 = $asteroid4bg5/asteroid4bg
+	onready var abg19 = $asteroid4bg6/asteroid4bg
+
+	func _process(delta) -> void:
+		self.motion_offset.x += asteroid_speed * delta
+		abg1.rotation_degrees += 2
+		abg2.rotation_degrees -= 1
+		abg3.rotation_degrees += .5
+		abg4.rotation_degrees -= 2
+		abg5.rotation_degrees -= 1
+		abg6.rotation_degrees += .5
+		abg7.rotation_degrees += 2
+		abg8.rotation_degrees += 1
+		abg9.rotation_degrees -= 2
+		abg10.rotation_degrees += 2
+		abg11.rotation_degrees -= 1
+		abg12.rotation_degrees -= 2
+		abg13.rotation_degrees += .5
+		abg14.rotation_degrees += 1
+		abg15.rotation_degrees -= 2
+		abg16.rotation_degrees += 2
+		abg17.rotation_degrees -= 1
+		abg18.rotation_degrees += .5
+		abg19.rotation_degrees -= 2
+
+
+	# Called when the node enters the scene tree for the first time.
+	func _ready():
+		pass # Replace with function body.
+
+
+	# Called every frame. 'delta' is the elapsed time since the previous frame.
+	#func _process(delta):
+	#	pass
