@@ -666,3 +666,633 @@ Asteroids:
 	# Called every frame. 'delta' is the elapsed time since the previous frame.
 	#func _process(delta):
 	#	pass
+
+I've added quite a bit since I last journalled including a third level different player mechanics for said level, I commented on all my code, added a lift off sequence to the end of the levels, added menus and story loading screens. I think that most things went straight forward, the only trial and error moments I had was with getting a signal to work, but I had it on a function that wasn't being called which was the main problem there. The other problem was one of my fonts wasn't displaying correctly, but it turned out to be a problem with the file itself, I changed the spacing on it to global and the problem went away. I will post all the scripts below, they have commented on them where they are used.
+
+This script is used on level one to animate the dust in the back and foreground
+
+	extends ParallaxLayer#This script is used to animate ParallaxLayer with default animation
+
+	onready var aS = $AnimatedSprite#On ready grab child node sprite
+
+	func _ready():#On ready when first entering scene
+		aS.play("default")#play sprite animation default
+		
+This script is used to control the camera in levels one and two
+
+	extends Camera2D
+	var zoom_min = Vector2(1.0,1.0)#var zoom vector set to 1 (zoomed out)
+	var zoom_max = Vector2(0.60,0.60)#var zoom vector set to .55 (zoomed in)
+	var zoomextension = Vector2(1.0,1.0)#zoom extension which can be clamped
+	var zoom_increment = Vector2(.05,.05)#variable for the increment of zoom
+	onready var deathSp = $deathSprite#onready variable for deathsprite
+	var follow = true#follow variable by default equals true
+
+
+	func _ready():#on ready function, called once at the start of level
+		deathSp.visible = false#set death UI to invisible
+
+	func _process(_delta):
+		if follow == true:#If follow is set to true
+			self.position = get_parent().get_node("KinematicBody2D").position#Copy the position of KinematicBody2D(the player(, get_parent has to be used here because they are siblings, and only children can be called directly
+		else:
+			 pass#else if false don't follow the player or pass
+
+	# warning-ignore:unused_argument
+	func _input(event):
+		zoomextension.x = clamp(zoomextension.x, 0.6,1.0)#clamp zoom extension maximum and minimum x axis
+		zoomextension.y = clamp(zoomextension.y, 0.6,1.0)#clamp zoom extension maximum and minimum y axis
+		if Input.is_action_pressed("zoomout"):#If the action defined as zoomin is pushed
+			if zoomextension == zoom_min:#If zoom extension is set to the same as the var (min) then pass
+				pass
+			else:
+				zoom += zoom_increment#otherwise increase zoom by zoom increment
+				zoomextension += zoom_increment#and do the same to zoom extension
+		if Input.is_action_pressed("zoomin"):#If the action defined as zoomin is pushed
+			if zoomextension == zoom_max:#if zoom extension is set to the same as the var (max) then pass
+				pass
+			else:
+				zoom -= zoom_increment#otherwise decrease zoom by zoom increment
+				zoomextension -= zoom_increment#and do the same to zoom extension
+
+	func _on_KinematicBody2D_showdeathUI():
+		deathSp.visible = true#change deathUI sprite to visible
+		follow = false#change follow to false
+		
+This script is used for the fall box on level two
+
+	extends Area2D
+
+	func _on_DeathArea2D_body_entered(body):#upon entering body
+		body.deathtype = 1#call for the variable in body and change it to 4
+		body.death()#call for the function death in body
+		var time_in_seconds = 2 #variable set to a number that we'll use for timer
+		yield(get_tree().create_timer(time_in_seconds), "timeout") #This yield waits for the grabbed tree which is a timer which counts down from our variable
+	# warning-ignore:return_value_discarded
+		get_tree().reload_current_scene()#reload current scene
+
+This script controls the enemy blob
+
+	extends KinematicBody2D
+	var stopped = Vector2(0,0)#variable definition for stopped
+	var velocity = Vector2(0,0)# This sets a variable for our velocity set to an empty vector
+	var speed = 200# A variable that'll act as our main speed for the enemy
+	var direction = -1# starting direction for the enemy
+	onready var eBS = $EnemyBlobSprite#onready variable for enemy blob sprite
+	onready var eBAu= $enemyAudio#onready variable for enemy blob audio
+	onready var deAu = $enemyAudioDeath#onready variable for enemy blob audio death
+	var dead = false#variable for dead set to false by default
+	func _ready():#onready called once at the start of the level
+		eBAu.play()#onready play enemy blob audio
+	func _physics_process(_delta):#Run this process on delta
+		if dead == false:#if dead equals false continue
+			velocity.x = speed * direction# This uses direction as a multiplier for speed to determine velocity
+			#print ("position" + str(position)) FOR DEBUGGING PRINT POSITION
+			if direction == -1:# if the sprite is moving left
+				eBS.flip_h = false#Do not flip the sprite
+
+			else:
+				eBS.flip_h = true#Else flip the sprite
+			if velocity == stopped:#if velocity is equal to variable stop (0)
+				pass#then pass, don't play animation
+			else:
+				eBS.play("blobMove")#Play child $Animated sprite with animation blobMove
+	# warning-ignore:return_value_discarded
+			move_and_slide(velocity)#Determines that the type of velocity is move and slide which can move and slide other nodes
+			if $GroundRayCast2D.is_colliding() == false:#If the raycast doesn't collide
+				direction = direction * -1#Change direction(inverse)
+				$GroundRayCast2D.position.x *= -1#Changes the position to the relative flipped position
+		else:
+			pass
+
+	# warning-ignore:unused_argument
+	func _on_enemyKillArea2D_body_entered(body):#On area entered
+		body.deathtype = 3#calls for death type to be changed to 3 in body
+		body.death()#call for death func in body
+
+
+	# warning-ignore:unused_argument
+	func _on_enemyDieArea2D_body_entered(_body):#On area entered
+		dead = true #set dead to true so that physics process is passed
+		speed = 0 #set speed to 0 so that velocity in turn is 0
+		$enemyKillArea2D.queue_free()#cull node and children this is to stop accidental second triggering
+		$enemyDieArea2D.queue_free()#cull node and children this is to stop accidental second triggering
+		eBS.play("blobSplat")#this then calls the death animation
+		eBAu.stop()#stop enemy blob idle audio
+		deAu.play()#play death audio
+
+This script controls the fire
+
+	extends Area2D
+
+	onready var fS = $fireSprite#On ready variable that refers to Sprite node
+	onready var fAu = $fireAudio#On ready variable that refers to Audio node
+
+	func _ready():#On ready when first entering scene
+		fS.play("fire")#play sprite animation fire
+		fAu.play ()#play audio from this node
+
+	func _on_fireArea2D_body_entered(body):#on body entering area
+		body.deathtype = 2#call for deathtype variable change to 2 in body
+		body.death()#call for death function in body
+		
+This script controls fuel collectible on level one
+
+	extends Node2D
+
+	onready var fS = $fuelSprite#on ready variable that grabs sprite node
+	onready var fAu = $fuelAudio#on ready variable that grabs audio node
+	onready var fSh2D = $fuelShape2D#on ready variable for fuelShape2D
+	var time_in_seconds = 0.28#Time in seconds, has to be enough to cover the sound effect only once
+
+	func _ready():#On ready when first entering scene
+		fS.play("fuelIdle") #plays it's animation fuelIdle
+
+
+	func _on_fuelArea_body_entered(body):#On entering body
+		body.fuel_count() ## searches for the body that entered fuelArea and tells it to run it's function fuel_count
+		fAu.play()#play fuel Audio
+		fSh2D.queue_free()#queue free collision shape for fuel, stops multiple activation
+		fS.queue_free()#queue free fuel sprite
+		yield(get_tree().create_timer(time_in_seconds), "timeout")#yield until timeout
+		queue_free()#cull node and children
+		
+This script controls the hidden area on level one
+
+	extends Area2D
+
+	onready var HidSto = $hideableStone#Variable for sprite
+
+	func _ready():#On ready
+		HidSto.visible = true#Show this sprite
+
+
+	func _on_caveHideArea_body_entered(_body):#When entering the body
+		#print("BODY ENTERED")#FOR DEBUGGING
+		HidSto.visible = false#Hide this sprite
+
+
+
+	func _on_caveHideArea_body_exited(_body):#When exiting this body
+		HidSto.visible = true#Show this sprite
+		
+This script is the main script for level one, but only controls the background music
+
+	extends Node2D
+
+	onready var bgM = $bgMusicLevelOne#On ready variable that refers to audio node
+
+	func _ready():#On ready when first entering scene
+		bgM.play()#Play audio from this node
+		
+This is the script for level two
+
+	extends Node2D
+
+	var ufoarea = false#variable for ufoarea(when the player is in ufo) set to false
+	var ufoactive = 1#variable for the ufo being active
+	signal ufodeactivated#signal when the ufo gets deactivated
+	onready var mine1 = $Asteroids/Mine6#onready variable for mine6
+	onready var mine2 = $Asteroids/Mine7#onready variable for mine7
+	onready var mine3 = $Asteroids/Mine8#onready variable for mine8
+	onready var bgm = $bgm#variable for background music
+
+	func _ready():#ready function called once on starting/loading level
+		bgm.play()#play background music
+
+	func _process(_delta):#function for process which is run by delta (time between fps)
+		self.rotatemines(_delta)#on delta run this function
+
+	func _input(_event):
+		if ufoarea == true:#if ufo area equals true
+			if Input.is_action_pressed("controlUse"):# if E or controlUse is pressed
+				ufoactive = 0#ufoactive is changed to 0
+				self.emit_signal ("ufodeactivated")#and signal ufodeactivated is sent
+
+
+	func _on_ufoDeactivateArea2D_body_entered(_body):#on entering body Ufo area becomes true
+		ufoarea = true
+		#print("ufoareaenter")#FORDEBUGGING
+		#print(ufoarea)#FORDEBUGGING
+
+	func _on_ufoDeactivateArea2D_body_exited(_body):#on exiting body Ufo area becomes false
+		ufoarea = false
+		#print("ufoareaexit")#FORDEBUGGING
+		#print(ufoarea)#FORDEBUGGING
+
+	func rotatemines(_delta):#function for rotate mines called every delta(time between fps)
+		mine1.rotation_degrees += 1#rotate mine 1 degree per delta
+		mine2.rotation_degrees += 1#rotate mine 1 degree per delta
+		mine3.rotation_degrees += 1#rotate mine 1 degree per delta
+
+This is the script for level three, this script could have been better by dividing up the script into referenced scenes
+
+	extends Node2D
+
+	onready var aA = $attacks/set1/asteroid1Still#This sets an onready variable for all the asteroids(or incoming debris)
+	onready var aA2 = $attacks/set1/asteroid1Still2
+	onready var aA3 = $attacks/set1/asteroid1Still3
+	onready var aA4 = $attacks/set1/asteroid1Still4
+	onready var aA5 = $attacks/set1/asteroid1Still5
+	onready var aA6 = $attacks/set1/asteroid1Still6
+	onready var aA7 = $attacks/set1/asteroid1Still7
+	onready var aA8 = $attacks/set1/asteroid1Still8
+	onready var aA9 = $attacks/set1/asteroid1Still9
+	onready var aA10 = $attacks/set1/asteroid1Still10
+	onready var aA11 = $attacks/set1/asteroid1Still11
+	onready var aA12 = $attacks/set1/asteroid1Still12
+	onready var aA13 = $attacks/set1/asteroid1Still13
+	onready var aA14 = $attacks/set1/asteroid1Still14
+	onready var aA15 = $attacks/set1/asteroid1Still15
+	onready var aA16 = $attacks/set1/asteroid1Still16
+	onready var aA17 = $attacks/set1/asteroid1Still17
+	onready var aA18 = $attacks/set1/asteroid1Still18
+	onready var aA19 = $attacks/set1/asteroid1Still19
+	onready var aA20 = $attacks/set1/asteroid1Still20
+	onready var aA21 = $attacks/set1/asteroid1Still21
+	onready var aA22 = $attacks/set1/asteroid1Still22
+	onready var aA23 = $attacks/set1/asteroid1Still23
+	onready var aA24 = $attacks/set1/asteroid1Still24
+	onready var aA25 = $attacks/set2/asteroid1Still
+	onready var aA26 = $attacks/set2/asteroid1Still2
+	onready var aA27 = $attacks/set2/asteroid1Still3
+	onready var aA28 = $attacks/set2/asteroid1Still4
+	onready var aA29 = $attacks/set2/asteroid1Still5
+	onready var aA30 = $attacks/set2/asteroid1Still6
+	onready var aA31 = $attacks/set2/asteroid1Still7
+	onready var aA32 = $attacks/set2/asteroid1Still8
+	onready var aA33 = $attacks/set2/asteroid1Still9
+	onready var aA34 = $attacks/set2/asteroid1Still10
+	onready var aA35 = $attacks/set2/asteroid1Still11
+	onready var aA36 = $attacks/set2/asteroid1Still12
+	onready var aA37 = $attacks/set2/asteroid1Still13
+	onready var aA38 = $attacks/set2/asteroid1Still14
+	onready var aA39 = $attacks/set2/asteroid1Still15
+	onready var aA40 = $attacks/set2/asteroid1Still16
+	onready var aA41 = $attacks/set2/asteroid1Still17
+	onready var aA42 = $attacks/set2/asteroid1Still18
+	onready var aA43 = $attacks/set2/asteroid1Still19
+	onready var aA44 = $attacks/set2/asteroid1Still20
+	onready var aA45 = $attacks/set2/asteroid1Still21
+	onready var aA46 = $attacks/set2/asteroid1Still22
+	onready var aA47 = $attacks/set2/asteroid1Still23
+	onready var aA48 = $attacks/set2/asteroid1Still24
+	onready var aA49 = $attacks/set2/asteroid1Still
+	onready var aA50 = $attacks/set2/asteroid1Still2
+	onready var aA51 = $attacks/set2/asteroid1Still3
+	onready var aA52 = $attacks/set2/asteroid1Still4
+	onready var aA53 = $attacks/set2/asteroid1Still5
+	onready var aA54 = $attacks/set2/asteroid1Still6
+	onready var aA55 = $attacks/set2/asteroid1Still7
+	onready var aA56 = $attacks/set2/asteroid1Still8
+	onready var aA57 = $attacks/set2/asteroid1Still9
+	onready var aA58 = $attacks/set2/asteroid1Still10
+	onready var aA59 = $attacks/set2/asteroid1Still11
+	onready var aA60 = $attacks/set2/asteroid1Still12
+	onready var aA61 = $attacks/set2/asteroid1Still13
+	onready var aA62 = $attacks/set2/asteroid1Still14
+	onready var aA63 = $attacks/set2/asteroid1Still15
+	onready var aA64 = $attacks/set2/asteroid1Still16
+	onready var aA65 = $attacks/set2/asteroid1Still17
+	onready var aA66 = $attacks/set2/asteroid1Still18
+	onready var aA67 = $attacks/set2/asteroid1Still19
+	onready var aA68 = $attacks/set2/asteroid1Still20
+	onready var aA69 = $attacks/set2/asteroid1Still21
+	onready var aA70 = $attacks/set2/asteroid1Still22
+	onready var aA71 = $attacks/set2/asteroid1Still23
+	onready var aA72 = $attacks/set2/asteroid1Still24
+	onready var lastAsteroid = $attacks/set3/lastasteroid
+	signal moveEarth#creates a signal called moveEarth
+	onready var bgm = $bgm#onready variable for background music
+
+	var slowasteroid = Vector2(0.0,5.0)#speed variable for slow asteroid
+	var mediumasteroid = Vector2(0.0,6.0)#speed varialbe for medium asteroid
+	var fastasteroid = Vector2(0.0,7.5)#speed variable for fast asteroid
+	# Called when the node enters the scene tree for the first time.
+	func _ready():#on ready, called once at the start of Level
+		bgm.play()#play background music
+
+	func _process(_delta):
+		aA.position += fastasteroid#These lines grab the asteroid variable and give them a speed, a better way to have done this would have been to code the asteroids individually and reference the scenes
+		aA2.position += slowasteroid
+		aA3.position += mediumasteroid
+		aA4.position += slowasteroid
+		aA5.position += fastasteroid
+		aA6.position += slowasteroid
+		aA7.position += mediumasteroid
+		aA8.position += slowasteroid
+		aA9.position += fastasteroid
+		aA10.position += slowasteroid
+		aA11.position += mediumasteroid
+		aA12.position += fastasteroid
+		aA13.position += mediumasteroid
+		aA14.position += slowasteroid
+		aA15.position += fastasteroid
+		aA16.position += slowasteroid
+		aA17.position += fastasteroid
+		aA18.position += slowasteroid
+		aA19.position += mediumasteroid
+		aA20.position += slowasteroid
+		aA21.position += mediumasteroid
+		aA22.position += slowasteroid
+		aA23.position += fastasteroid
+		aA24.position += slowasteroid
+		aA25.position += fastasteroid
+		aA26.position += slowasteroid
+		aA27.position += mediumasteroid
+		aA28.position += slowasteroid
+		aA29.position += fastasteroid
+		aA30.position += slowasteroid
+		aA31.position += mediumasteroid
+		aA32.position += slowasteroid
+		aA33.position += fastasteroid
+		aA34.position += slowasteroid
+		aA35.position += mediumasteroid
+		aA36.position += fastasteroid
+		aA37.position += mediumasteroid
+		aA38.position += slowasteroid
+		aA39.position += fastasteroid
+		aA40.position += slowasteroid
+		aA41.position += fastasteroid
+		aA42.position += slowasteroid
+		aA43.position += mediumasteroid
+		aA44.position += slowasteroid
+		aA45.position += mediumasteroid
+		aA46.position += slowasteroid
+		aA47.position += fastasteroid
+		aA48.position += slowasteroid
+		aA49.position += fastasteroid
+		aA50.position += slowasteroid
+		aA51.position += mediumasteroid
+		aA52.position += slowasteroid
+		aA53.position += fastasteroid
+		aA54.position += slowasteroid
+		aA55.position += mediumasteroid
+		aA56.position += slowasteroid
+		aA57.position += fastasteroid
+		aA58.position += slowasteroid
+		aA59.position += mediumasteroid
+		aA60.position += fastasteroid
+		aA61.position += mediumasteroid
+		aA62.position += slowasteroid
+		aA63.position += fastasteroid
+		aA64.position += slowasteroid
+		aA65.position += fastasteroid
+		aA66.position += slowasteroid
+		aA67.position += mediumasteroid
+		aA68.position += slowasteroid
+		aA69.position += mediumasteroid
+		aA70.position += slowasteroid
+		aA71.position += fastasteroid
+		aA72.position += slowasteroid
+		lastAsteroid.position += slowasteroid
+		if lastAsteroid.position == Vector2(400,12500):#when last asteroid reaches this position
+			self._moveEarth()#run the moveEarth function
+
+	func _moveEarth():#moveEarth function called once when lastAsteroid reaches a position
+		emit_signal("moveEarth")#Emit signal moveEarth
+		#print ("emitting signal move earth")##FORDEBUGGING
+
+	func _on_asteroidbody_body_entered(body):#when a body enters asteroid body
+		if body.name == "SpaceshipBody2D":#if the name of the body is SpaceshipBody2D
+			body.death()#Call for the death function on the body
+
+This script controls the level select controls
+
+	extends Control
+
+	func _ready():
+		$VBoxContainer/Menu.grab_focus()#Grab the focus of the button Start(for keyboard navigation)
+
+	func _on_Menu_button_up():#on menu button up
+		# warning-ignore:return_value_discarded
+		get_tree().change_scene("res://Menu.tscn")#load this scene
+	func _on_LevelOne_button_up():#on LevelOne button up
+		# warning-ignore:return_value_discarded
+		get_tree().change_scene("res://Load1.tscn")#load this scene
+	func _on_LevelTwo_button_up():#on LevelTwo button up
+		# warning-ignore:return_value_discarded
+		get_tree().change_scene("res://Load2.tscn")#load this scene
+	func _on_LevelThree_button_up():#on LevelThree button up
+		# warning-ignore:return_value_discarded
+		get_tree().change_scene("res://Load3.tscn")#load this scene
+	func _input(_event):
+		if Input.is_action_pressed("exitToMenu"):#if escape is pressed exit ot menu
+			# warning-ignore:return_value_discarded
+			get_tree().change_scene("res://Menu.tscn")
+			
+This script controls the main menu controls
+
+	extends Control
+
+	func _ready():#On ready when first entering scene
+		$VBoxContainer/Start.grab_focus()#Grab the focus of the button Start(for keyboard navigation)
+
+	func _on_Start_button_up():#on releasing this button
+		# warning-ignore:return_value_discarded
+		get_tree().change_scene("res://Load1.tscn")#load this scene
+
+	func _on_LevelSelect_button_up():#on releasing this button
+		# warning-ignore:return_value_discarded
+		get_tree().change_scene("res://levelSelect.tscn")#load this scene
+
+	func _on_Credits_button_up():#on releasing this button
+		# warning-ignore:return_value_discarded
+		get_tree().change_scene("res://credits.tscn")#load this scene
+
+	func _on_Quit_button_up():#on releasing this button
+		get_tree().quit()#quit the game
+		
+This script is for the sign areas to show when entered and hide when exited in level one
+
+	extends Area2D
+
+	func _ready():#On ready when first entering scene
+		$Label.hide()#hide the child label
+	# warning-ignore:unused_argument
+	func _on_Area2Dztzi_body_entered(body):#On entering the body
+		$Label.show()#Show the child label
+	# warning-ignore:unused_argument
+	func _on_Area2Dztzi_body_exited(_body):#On exiting the body
+		$Label.hide()#Hide child label
+		
+This script is for the parallax on level one and level two, I found a way to combine scripts without getting an error from missing nodes, this was by doing a name check. if self.name ==
+
+	extends ParallaxLayer
+
+	export var star_speed = -2#variable for our scrolling speed of the background
+	export var warp_speed = 1500#warp speed variable
+	var warpslowdown = false#warpslowdown variable set to false
+
+	func _process(delta):
+		self.motion_offset.x += star_speed * delta#tells itself to move in the x position by delta
+		if self.name == "ParallaxLevel3":#if self name is ParallaxLevel3 then move me 1500 on y axis per delta
+			self.motion_offset.y += warp_speed * delta
+		if warpslowdown == true and self.name == "ParallaxLevel3":#if warpslowdown is true and self name is parallaxLevel3 then lerp warp speed to 0 bt 0.01 per delta
+			self.warp_speed = lerp(warp_speed, 0, 0.01)
+
+	func _on_levelThree_moveEarth():#on receiving the signal moveEarth
+		warpslowdown = true#changes variable warpslowdown to true
+
+This is the script for the win area
+
+	extends Area2D
+
+	var level2ffd = false#variable for level 2 forcefield
+	var liftoff = false#variable for level 1 win parameter
+	var wintime_in_seconds = 3#time to show rocket taking off
+
+	func _ready():#On ready when first entering scene
+		$Label.hide()#Hides the child Label
+		$ePFSprite.visible = false#hide the rocket fire animation
+
+	func _process(_delta):
+		if liftoff == true:#if liftoff is set to true then move self =5 on the y position per delta 
+			self.position += Vector2(0,-5)
+
+	func _on_Area2D_body_entered(body):#On entering the body
+		if body.get("liftoff"):#if the body that entered has a variable liftoff
+			body.cutsceneFinish()#call for function cutscenestart on body
+			liftoff = true#set liftoff to true
+			$escapePodSprite.play("takeoff")#play take off animation
+			$ePFSprite.visible = true#set rocket fire to visible
+			$ePFSprite.play("default")#play rocket fires default animation
+			$rocketEngine.play()#play sound rocket engine
+			yield(get_tree().create_timer(wintime_in_seconds), "timeout")
+			# warning-ignore:return_value_discarded
+			get_tree().change_scene("res://Load2.tscn")#Then change the scene(set to same scene for now)
+		if level2ffd == true:#if the variable for level2 is true
+			body.cutsceneFinish()#call for function cutscenestart on body
+			liftoff = true#set liftoff to true
+			$escapePodSprite.play("takeoff")#play take off animation
+			$ePFSprite.visible = true#set rocket fire to visible
+			$ePFSprite.play("default")#play rocket fires default animation
+			$rocketEngine.play()#play sound rocket engine
+			yield(get_tree().create_timer(wintime_in_seconds), "timeout")
+			# warning-ignore:return_value_discarded
+			get_tree().change_scene("res://Load3.tscn")
+		else:
+			$Label.show()#(else show the label which has the text not enough fuel
+			#print("not enough fuel")###FOR DEBUGGING
+	# warning-ignore:unused_argument
+	func _on_WinArea2D2_body_exited(_body):#On exiting the body
+		$Label.hide()#Hide child label
+
+	func _on_levelTwo_ufodeactivated():#on receiving the signal ufo deactivated set level 2 variable to true
+		level2ffd = true
+		
+And lastly but most definitely not least, this is the script for the player
+
+	extends KinematicBody2D
+	##This is what to apply the script to
+	var fuel = 0#varialbe for fuel that gets added to when the player picks up the fuel collectible
+	var liftoff = 0#Variable for liftoff, called by win area in level one, changed when the player has enough fuel
+	var velocity = Vector2(0,0)#Variable for velocity default not moving
+	##vector2 is the 2D equivalent for physics only needs two coordinates X and Y
+	var gravity = 1000#Variable for gravity value
+	##variable for gravity
+	var jumpcount = 1#Jump count so that the player can't jump infinitely once in the air
+	onready var aS = $AnimatedSprite#On ready variable to call sprite node
+	var vY = velocity.y
+	#onready var deathSp = "../$deathSprite"
+	var deathtime_in_seconds = 2
+	var moveable = true#a variable that can be set to false to stop the player moving
+	var deathtype = 1#defines what killed the player as a variable to be called
+	var truevar = true#True variable
+	var falsevar = false#False variable
+	signal showdeathUI#Signal for the deathUI to reveal itself
+
+	func _input(_event):
+		if Input.is_action_pressed("exitToMenu"):#When escape is pressed exit to menu
+			# warning-ignore:return_value_discarded
+			get_tree().change_scene("res://Menu.tscn")
+			
+I think I've covered the main ones here, but I will upload all of them into a folder here too.
+
+	func cutsceneFinish():#Function that will be called by the win area
+		moveable = false#Sets the player to unmoveable by changing variable
+		aS.visible = false#Sets player sprite to invisible
+
+	func death():
+		if deathtype == 1:#Death type 1, default death type, stop player movement, emit signal to deathUI, play death animation and countdown from 2
+			moveable = false
+			self.emit_signal("showdeathUI")
+			aS.play("padeath")#plays the animation padeath
+			yield(get_tree().create_timer(deathtime_in_seconds), "timeout")
+		# warning-ignore:return_value_discarded
+			get_tree().reload_current_scene()
+		elif deathtype == 2:#Death type 2, burning death, stop player movement, emit signal to deathUI,play death animation and countdown from 2
+			moveable = false
+			self.emit_signal("showdeathUI")
+			aS.play("padeathburnt")#plays the animation padeath
+			yield(get_tree().create_timer(deathtime_in_seconds), "timeout")
+		# warning-ignore:return_value_discarded
+			get_tree().reload_current_scene()
+		elif deathtype == 3:#Death type 2, enemy blob death, stop player movement, emit signal to deathUI,play death animation and countdown from 2
+			moveable = false
+			self.emit_signal("showdeathUI")
+			aS.play("padeathblob")#plays the animation padeath
+			yield(get_tree().create_timer(deathtime_in_seconds), "timeout")
+		# warning-ignore:return_value_discarded
+			get_tree().reload_current_scene()
+
+	func _physics_process(_delta):
+		if moveable == (true):
+	##function for physics that updates on delta
+			#if Input.is_action_pressed("debugflyup"):#FOR DEBUGGING FLY UP MAX SPEED 
+				#velocity.y= -1500
+			#if Input.is_action_pressed("debugflyleft"):#FOR DEBUGGING FLY LEFT FAST
+				#velocity.x= -3000
+			#if Input.is_action_pressed("debugflyright"):#FOR DEBUGGING FLY RIGHT FAST
+				#velocity.x= 3000
+			if Input.is_action_pressed("controlLeft") and not is_on_floor():#Move left when in the air and A is pushed
+				velocity.x = -400
+			if Input.is_action_pressed("controlRight") and not is_on_floor():#Move right when in the air and D is pushed
+				velocity.x = 400
+			if Input.is_action_just_pressed("controlSpace"):# and is_on_floor():
+				if jumpcount <= 0:#If jump count is 0 then pass
+					pass
+				else:
+					velocity.y= -500#Else let jump again
+					jumpcount -= 1#And minus one from jumpcount
+					#print (jumpcount)#FORDEBUGGING PRINT JUMPCOUNT
+			if Input.is_action_pressed("controlSpace") and is_on_floor() and Input.is_action_pressed("controlShift"):#If Shift and Space are pushed jump even higher
+					velocity.y= -700
+
+
+			if is_on_floor():#If the 2D area is on the floor add 1 to jump count
+				jumpcount += 1
+
+			if Input.is_action_pressed("controlLeft") and is_on_floor(): ##if left arrow is pressed
+				velocity.x = -400#Move the sprite with a velocity of -200 on the x axis
+				aS.play("parun")#play animated sprite 'run' 
+				aS.flip_h = true#flip the sprite horizontally
+
+			elif Input.is_action_pressed("controlRight") and is_on_floor():#This one is the opposite so that when the right arrow is pressed 
+				velocity.x = 400 #velocity x is 200 play animation run don't flip
+				aS.play("parun")
+				aS.flip_h = false
+			elif not is_on_floor():#if the areashape is not on the floor
+				if velocity.x <= -0:#If velocity is less than or equal to minus 0
+					aS.play("pafall")#Play pafall from aS
+					aS.flip_h = true  #flip aS
+				elif velocity.x >=0:#otherwise if velocity is greater than 0
+					aS.play("pafall")#Play pafall from aS
+					aS.flip_h = false#flip aS
+			else:
+				aS.play("paidle") ##otherwise play the idle animation
+
+		jumpcount = clamp(jumpcount, 0,1)#Clamps jump count so the least it can be is 0 and max is 1
+		velocity.y = velocity.y + gravity * (_delta)#This adds the gravity variable then makes the y velocity a multiple of of delta
+		velocity.y = clamp(velocity.y, -1500, 800)#This clamps velocity.y so the min it can equal is -1500 and max it can equal is 1000
+	# warning-ignore:return_value_discarded
+		move_and_slide(velocity, Vector2.UP)#Determines that the type of velocity is move and slide which can move and slide other nodes 
+		velocity.x = lerp(velocity.x,0,0.2)## this line above is linear interpolation which works like friction interpolating between 0 and .1
+	func fuel_count():
+		fuel = fuel + 1#Add one fuel when fuelcount is called
+		if fuel >= (3):#if fuel is greater than or equal to three
+			liftoff = 1#then liftoff equals one
+			#print ("ready for liftoff")#FOR DEBUGGING PRINT READY FOR LIFTOFF
+		#print (fuel)#FOR DEBUGGING PRINT FUEL
+		#print (liftoff)#FOR DEBUGGING PRINT LIFTOFF
+
