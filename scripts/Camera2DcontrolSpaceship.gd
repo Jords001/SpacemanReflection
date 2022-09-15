@@ -1,5 +1,5 @@
 extends Camera2D
-onready var deathSp = $deathSprite#onready variable for deathsprite
+onready var deathSp = $deathSprite #onready variable for deathsprite
 
 func _ready():#function ready called once at the start of a level
 	deathSp.visible = false#hide death UI
